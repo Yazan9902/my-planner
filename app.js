@@ -17,7 +17,7 @@ const tasksKey = `planner-tasks:${boardId}`;
 const activeKey = `planner-active-list:${boardId}`;
 const notifiedKey = `planner-notified:${boardId}`;
 
-const LIST_COLORS = ["#4f6df5", "#5b9a6b", "#e0573f", "#e0a23f", "#9b59d0", "#2bb1c4", "#e05f9a", "#6b7280"];
+const LIST_COLORS = ["#3f5cf0", "#2f8f5b", "#d84b32", "#c98412", "#9b59d0", "#2bb1c4", "#e05f9a", "#6b7280"];
 const WEEK_START_HOUR = 6;
 const WEEK_END_HOUR = 23;
 
@@ -218,14 +218,25 @@ function relTime(task) {
 /* ============================================================
    Theme
    ============================================================ */
+const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
 function applyTheme(theme) {
-  if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
-  else delete document.documentElement.dataset.theme;
+  const resolved = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = resolved;
+  // Keep the browser/PWA status-bar tint in sync with the active theme.
+  let meta = document.querySelector('meta[name="theme-color"]:not([media])');
+  if (!meta) { meta = document.createElement("meta"); meta.name = "theme-color"; document.head.appendChild(meta); }
+  meta.content = resolved === "dark" ? "#131419" : "#f6f2e9";
 }
 function currentTheme() {
-  return localStorage.getItem(themeKey) || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  return localStorage.getItem(themeKey) || (darkQuery.matches ? "dark" : "light");
 }
-applyTheme(localStorage.getItem(themeKey));
+// Resolve on boot so the OS preference is honored even before any toggle.
+applyTheme(currentTheme());
+// Follow the OS while the user hasn't picked an explicit preference.
+darkQuery.addEventListener("change", (e) => {
+  if (!localStorage.getItem(themeKey)) applyTheme(e.matches ? "dark" : "light");
+});
 themeToggle.addEventListener("click", () => {
   const next = currentTheme() === "dark" ? "light" : "dark";
   localStorage.setItem(themeKey, next);
@@ -471,11 +482,19 @@ function renderWeek() {
     ? "This week"
     : `${fmt(first, true)} – ${fmt(last, !sameMonth)}`;
 
-  /* All-day (no time) tasks per day */
+  // A timed task only fits the grid if its hour is within the visible range;
+  // otherwise it shows as an all-day chip so it's never lost.
+  const inGrid = (t) => {
+    if (!t.time) return false;
+    const h = Number(t.time.split(":")[0]);
+    return h >= WEEK_START_HOUR && h <= WEEK_END_HOUR;
+  };
+
+  /* All-day tasks + any timed task outside the visible hours */
   weekAllday.replaceChildren();
   days.forEach((day) => {
     const ds = ymd(day);
-    const dayTasks = tasks.filter((t) => t.dueDate === ds && !t.time);
+    const dayTasks = tasks.filter((t) => t.dueDate === ds && !inGrid(t));
     if (dayTasks.length === 0) return;
     const row = document.createElement("div");
     row.className = "allday-row";
@@ -488,7 +507,7 @@ function renderWeek() {
       const c = document.createElement("button");
       c.type = "button";
       c.className = "allday-chip" + (t.done ? " done" : "");
-      c.textContent = t.title;
+      c.textContent = (t.time ? fmtTime(t.time) + " " : "") + t.title;
       c.style.setProperty("--list-color", colorForList(t.listId));
       c.dataset.id = t.id;
       c.addEventListener("click", () => openTaskDialog("edit", t.id));
@@ -524,37 +543,33 @@ function renderWeek() {
     });
   }
 
-  /* Place timed task blocks */
+  /* Place timed task blocks (only those within the visible hours).
+     Measure geometry once — robust to font scaling (Dynamic Type) and avoids
+     per-block layout thrashing. */
   const hourHeight = 44;
+  const labelW = 44;
+  const gridWidth = weekGrid.getBoundingClientRect().width;
+  const colW = (gridWidth - labelW) / 7;
+  const headerH = weekGrid.querySelector(".week-dayhead")?.offsetHeight || 44;
   days.forEach((day, di) => {
     const ds = ymd(day);
-    tasks.filter((t) => t.dueDate === ds && t.time).forEach((t) => {
+    tasks.filter((t) => t.dueDate === ds && inGrid(t)).forEach((t) => {
       const [h, m] = t.time.split(":").map(Number);
-      if (h < WEEK_START_HOUR || h > WEEK_END_HOUR) return;
       const block = weekBlockTemplate.content.firstElementChild.cloneNode(true);
       block.classList.toggle("done", !!t.done);
       block.style.setProperty("--list-color", colorForList(t.listId));
       block.dataset.id = t.id;
       const topOffset = (h - WEEK_START_HOUR) * hourHeight + (m / 60) * hourHeight;
       const dur = Number(t.durationMin) || 30;
+      block.style.left = `${labelW + di * colW + 2}px`;
+      block.style.width = `${colW - 4}px`;
+      block.style.top = `${headerH + topOffset + 1}px`;
       block.style.height = `${Math.max(18, (dur / 60) * hourHeight - 2)}px`;
       block.innerHTML = `<span class="bt">${fmtTime(t.time)}</span>${t.title}`;
       block.addEventListener("click", (e) => { e.stopPropagation(); openTaskDialog("edit", t.id); });
-      placeBlock(block, di, topOffset);
+      weekGrid.append(block);
     });
   });
-}
-
-/* Absolutely position a week block over the correct day column. */
-function placeBlock(block, dayIndex, topOffset) {
-  // Column geometry: first column (44px) + dayIndex fractional columns.
-  const gridRect = weekGrid.getBoundingClientRect();
-  const labelW = 44;
-  const colW = (gridRect.width - labelW) / 7;
-  block.style.left = `${labelW + dayIndex * colW + 2}px`;
-  block.style.width = `${colW - 4}px`;
-  block.style.top = `${44 /* header */ + topOffset + 1}px`;
-  weekGrid.append(block);
 }
 
 function cell(cls) { const d = document.createElement("div"); d.className = cls; return d; }

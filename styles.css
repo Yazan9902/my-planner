@@ -827,6 +827,7 @@ input:focus, select:focus, textarea:focus {
 
 /* -------------------- "Right now" focus card -------------------- */
 .focus-card {
+  background: var(--accent); /* fallback if color-mix unsupported */
   background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #7a4ff5));
   color: #fff;
   border-radius: var(--radius);
