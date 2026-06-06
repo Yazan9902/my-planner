@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f6f2e9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#131419" media="(prefers-color-scheme: dark)" />
+    <meta name="description" content="A personal to-do list, scheduler, and weekly planner." />
+
+    <title>My Planner</title>
+
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Planner" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&display=swap"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" type="module"></script>
+  </head>
+  <body>
+    <!-- Icon sprite: one consistent line set (Lucide-style, 2px stroke). -->
+    <svg width="0" height="0" class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 6 9 17l-5-5" />
+      </symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
+        <path d="M10 11v6M14 11v6" />
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5v14M5 12h14" />
+      </symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z" />
+      </symbol>
+      <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+      </symbol>
+      <symbol id="i-today" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 7v5l3 2" />
+        <circle cx="12" cy="12" r="9" />
+      </symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <path d="M3 9h18M8 2v4M16 2v4" />
+      </symbol>
+      <symbol id="i-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3v12M8 7l4-4 4 4" />
+        <path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7" />
+      </symbol>
+      <symbol id="i-install" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3v12M8 11l4 4 4-4" />
+        <path d="M5 21h14" />
+      </symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+      </symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+      </symbol>
+      <symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 18l-6-6 6-6" />
+      </symbol>
+      <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 18l6-6-6-6" />
+      </symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 21V4h13l-2 4 2 4H4" />
+      </symbol>
+      <symbol id="i-repeat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 2l4 4-4 4" />
+        <path d="M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4" />
+        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+      </symbol>
+      <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+        <path d="M5.5 5h13l3.5 7v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-6Z" />
+      </symbol>
+      <symbol id="i-more" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+        <circle cx="5" cy="12" r="2" />
+        <circle cx="12" cy="12" r="2" />
+        <circle cx="19" cy="12" r="2" />
+      </symbol>
+    </svg>
+
+    <main class="app-shell">
+      <header class="page-header">
+        <div class="header-text">
+          <p class="eyebrow" id="header-eyebrow">Let's plan</p>
+          <h1 id="header-title">Today</h1>
+          <span id="sync-status" class="sync-status" aria-live="polite">Saved on this device</span>
+        </div>
+
+        <div class="header-side">
+          <button id="notify-toggle" class="icon-button" type="button" aria-label="Enable reminders" title="Enable reminders">
+            <svg class="icon" aria-hidden="true"><use href="#i-bell" /></svg>
+          </button>
+          <button id="theme-toggle" class="icon-button" type="button" aria-label="Switch theme">
+            <svg class="icon icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
+            <svg class="icon icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
+          </button>
+          <button id="more-toggle" class="icon-button" type="button" aria-label="More options" aria-haspopup="true" aria-expanded="false">
+            <svg class="icon" aria-hidden="true"><use href="#i-more" /></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- ============ TODAY VIEW ============ -->
+      <section id="view-today" class="view" data-view="today">
+        <div id="today-progress" class="today-progress hidden">
+          <div class="progress-track"><div class="progress-fill"></div></div>
+          <span class="progress-label"></span>
+        </div>
+        <div id="focus-card" class="focus-card hidden"></div>
+        <div id="today-groups" class="today-groups"></div>
+        <div id="today-empty" class="empty-state hidden">
+          <div class="empty-icon" aria-hidden="true"><svg class="icon"><use href="#i-today" /></svg></div>
+          <h3>Nothing due</h3>
+          <p>You're all caught up. Tap + to plan something.</p>
+        </div>
+      </section>
+
+      <!-- ============ WEEK VIEW ============ -->
+      <section id="view-week" class="view hidden" data-view="week">
+        <div class="week-bar">
+          <button id="week-prev" class="icon-button small" type="button" aria-label="Previous week">
+            <svg class="icon" aria-hidden="true"><use href="#i-chevron-left" /></svg>
+          </button>
+          <button id="week-today" class="text-button" type="button">This week</button>
+          <button id="week-next" class="icon-button small" type="button" aria-label="Next week">
+            <svg class="icon" aria-hidden="true"><use href="#i-chevron-right" /></svg>
+          </button>
+        </div>
+        <div id="week-allday" class="week-allday"></div>
+        <div id="week-grid" class="week-grid"></div>
+      </section>
+
+      <!-- ============ LISTS VIEW ============ -->
+      <section id="view-lists" class="view hidden" data-view="lists">
+        <nav class="lists-bar" aria-label="Your lists">
+          <div id="lists-tabs" class="lists-tabs"></div>
+          <button id="add-list" class="add-list-button" type="button" aria-label="New list">
+            <svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>
+          </button>
+        </nav>
+
+        <div class="list-heading">
+          <h2 id="list-title">Your tasks</h2>
+          <div class="list-actions">
+            <button id="rename-list" class="icon-text-button" type="button" hidden>
+              <svg class="icon" aria-hidden="true"><use href="#i-edit" /></svg>
+              <span>Edit</span>
+            </button>
+            <button id="clear-done" class="text-button" type="button">Clear done</button>
+          </div>
+        </div>
+
+        <div class="filters" role="group" aria-label="Filter tasks">
+          <span class="filter-pill" aria-hidden="true"></span>
+          <button class="filter active" data-filter="all" type="button">All</button>
+          <button class="filter" data-filter="active" type="button">To do</button>
+          <button class="filter" data-filter="done" type="button">Done</button>
+        </div>
+
+        <ul id="task-list" class="task-list"></ul>
+
+        <div id="lists-empty" class="empty-state">
+          <div class="empty-icon" aria-hidden="true"><svg class="icon"><use href="#i-inbox" /></svg></div>
+          <h3>No tasks yet</h3>
+          <p>Add your first task with the + button.</p>
+          <button id="empty-action" class="primary-button" type="button" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>
+            <span>New list</span>
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Overflow menu (secondary actions, tucked away) -->
+    <div id="more-menu" class="more-menu" role="menu" hidden>
+      <button id="share-button" class="menu-item" type="button" role="menuitem">
+        <svg class="icon" aria-hidden="true"><use href="#i-share" /></svg>
+        <span>Share planner</span>
+      </button>
+      <button id="install-button" class="menu-item" type="button" role="menuitem" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-install" /></svg>
+        <span>Install app</span>
+      </button>
+    </div>
+
+    <!-- Floating add button -->
+    <button id="fab" class="fab" type="button" aria-label="New task">
+      <svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>
+    </button>
+
+    <!-- Bottom navigation -->
+    <nav class="tabbar" aria-label="Views">
+      <button class="tab active" data-tab="today" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-today" /></svg>
+        <span>Today</span>
+      </button>
+      <button class="tab" data-tab="week" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-calendar" /></svg>
+        <span>Week</span>
+      </button>
+      <button class="tab" data-tab="lists" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-list" /></svg>
+        <span>Lists</span>
+      </button>
+    </nav>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <!-- ========== Quick add (natural language) ========== -->
+    <dialog id="quick-dialog" class="dialog sheet">
+      <form method="dialog" id="quick-form" class="dialog-body quick-body">
+        <h2>Quick add</h2>
+        <label class="field">
+          <input
+            id="quick-input"
+            type="text"
+            maxlength="160"
+            placeholder="e.g. Call Mom tomorrow 3pm"
+            autocomplete="off"
+            autocapitalize="sentences"
+            enterkeyhint="done"
+            required
+          />
+        </label>
+        <p id="quick-preview" class="quick-preview" aria-live="polite"></p>
+        <p id="quick-added" class="quick-added" aria-live="polite"></p>
+        <div class="quick-suggestions" aria-label="Quick phrases">
+          <button type="button" class="suggest-chip" data-append="in 30 min">in 30 min</button>
+          <button type="button" class="suggest-chip" data-append="in 1 hour">in 1 hour</button>
+          <button type="button" class="suggest-chip" data-append="tonight">tonight</button>
+          <button type="button" class="suggest-chip" data-append="tomorrow 9am">tomorrow 9am</button>
+        </div>
+        <p class="quick-hint">Tip: try “remind me to …”, “in 2 hours”, “next monday 10am”, “every day”.</p>
+        <div class="dialog-actions">
+          <button id="quick-more" class="text-button" type="button">More options</button>
+          <span class="dialog-spacer"></span>
+          <button id="quick-cancel" class="ghost-button" type="button">Cancel</button>
+          <button id="quick-save" class="primary-button compact" type="submit">Add</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- ========== Task add/edit sheet ========== -->
+    <dialog id="task-dialog" class="dialog sheet">
+      <form method="dialog" id="task-form" class="dialog-body">
+        <h2 id="task-dialog-title">New task</h2>
+
+        <div id="snooze-row" class="snooze-row" hidden>
+          <span class="snooze-label">Snooze</span>
+          <button type="button" class="snooze-chip" data-snooze="1h">+1 hr</button>
+          <button type="button" class="snooze-chip" data-snooze="tonight">Tonight</button>
+          <button type="button" class="snooze-chip" data-snooze="tomorrow">Tomorrow</button>
+          <button type="button" class="snooze-chip" data-snooze="week">+1 wk</button>
+        </div>
+
+        <label class="field">
+          <span>Title</span>
+          <input id="task-title" type="text" maxlength="120" placeholder="What needs doing?" autocomplete="off" enterkeyhint="next" required />
+        </label>
+
+        <div class="form-row">
+          <label class="field">
+            <span>List</span>
+            <select id="task-list-select"></select>
+          </label>
+          <label class="field">
+            <span>Priority</span>
+            <select id="task-priority">
+              <option value="low">Low</option>
+              <option value="med" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-row">
+          <label class="field">
+            <span>Date</span>
+            <input id="task-date" type="date" />
+          </label>
+          <label class="field">
+            <span>Time</span>
+            <input id="task-time" type="time" />
+          </label>
+        </div>
+
+        <div class="form-row">
+          <label class="field">
+            <span>Duration</span>
+            <select id="task-duration">
+              <option value="0">None</option>
+              <option value="15">15 min</option>
+              <option value="30" selected>30 min</option>
+              <option value="60">1 hour</option>
+              <option value="90">1.5 hours</option>
+              <option value="120">2 hours</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Repeat</span>
+            <select id="task-repeat">
+              <option value="">Never</option>
+              <option value="daily">Daily</option>
+              <option value="weekdays">Weekdays</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Remind me</span>
+          <select id="task-remind">
+            <option value="-1">No reminder</option>
+            <option value="0">At time of task</option>
+            <option value="10">10 min before</option>
+            <option value="30">30 min before</option>
+            <option value="60">1 hour before</option>
+            <option value="1440">1 day before</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Notes</span>
+          <textarea id="task-notes" maxlength="500" rows="2" placeholder="Optional details..."></textarea>
+        </label>
+
+        <div class="dialog-actions">
+          <button id="task-delete" class="text-button danger-button" type="button" hidden>Delete</button>
+          <span class="dialog-spacer"></span>
+          <button id="task-cancel" class="ghost-button" type="button">Cancel</button>
+          <button id="task-save" class="primary-button compact" type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- ========== Create / rename / delete a list ========== -->
+    <dialog id="list-dialog" class="dialog">
+      <form method="dialog" id="list-form" class="dialog-body">
+        <h2 id="list-dialog-title">New list</h2>
+        <label class="field">
+          <span>List name</span>
+          <input id="list-name-input" type="text" maxlength="60" placeholder="Work, Personal, Errands..." autocomplete="off" enterkeyhint="done" required />
+        </label>
+        <label class="field">
+          <span>Color</span>
+          <div id="color-picker" class="color-picker" role="radiogroup" aria-label="List color"></div>
+        </label>
+        <div class="dialog-actions">
+          <button id="list-delete" class="text-button danger-button" type="button" hidden>Delete list</button>
+          <span class="dialog-spacer"></span>
+          <button id="list-cancel" class="ghost-button" type="button">Cancel</button>
+          <button id="list-save" class="primary-button compact" type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- ========== Templates ========== -->
+    <template id="task-template">
+      <li class="task-item">
+        <div class="item-swipe-bg" aria-hidden="true"><svg class="icon"><use href="#i-trash" /></svg></div>
+        <div class="task-surface">
+          <button class="check-button" type="button" aria-label="Mark done"><svg class="icon" aria-hidden="true"><use href="#i-check" /></svg></button>
+          <div class="task-details">
+            <p class="task-title"></p>
+            <p class="task-meta"></p>
+          </div>
+          <span class="task-dot" aria-hidden="true"></span>
+        </div>
+      </li>
+    </template>
+
+    <template id="list-tab-template">
+      <button class="list-tab" type="button"></button>
+    </template>
+
+    <template id="week-block-template">
+      <button class="week-block" type="button"></button>
+    </template>
+
+    <template id="today-group-template">
+      <div class="today-group">
+        <h2 class="group-title"></h2>
+        <ul class="task-list"></ul>
+      </div>
+    </template>
+  </body>
+</html>
