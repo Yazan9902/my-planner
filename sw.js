@@ -1,5 +1,5 @@
 // Bump this version to force the cache to refresh after a deploy.
-const CACHE = "planner-v10";
+const CACHE = "planner-v11";
 
 // App shell — files needed to render the UI offline. Firebase SDK and task
 // data are network-first (handled below), not precached.
@@ -56,15 +56,33 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
+// Incoming push from the cloud scheduler -> show a notification even when the
+// app is fully closed.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = { title: "Reminder", body: event.data ? event.data.text() : "" }; }
+  const title = data.title || "Reminder";
+  const options = {
+    body: data.body || "",
+    icon: "icons/icon-192.png",
+    badge: "icons/icon-192.png",
+    tag: data.tag || undefined,
+    data: { url: data.url || "." },
+    renotify: !!data.tag,
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
 // Tapping a reminder notification focuses (or opens) the app.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || ".";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
         if ("focus" in client) return client.focus();
       }
-      if (self.clients.openWindow) return self.clients.openWindow(".");
+      if (self.clients.openWindow) return self.clients.openWindow(url);
     }),
   );
 });

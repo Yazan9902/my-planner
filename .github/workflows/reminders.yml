@@ -1,0 +1,32 @@
+name: Send reminders
+
+# Checks for due task reminders and pushes notifications to subscribed devices.
+# GitHub's minimum cron interval is 5 minutes (and runs may be delayed a few
+# minutes under load), so reminders arrive within roughly 5-10 minutes.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {} # lets you run it manually from the Actions tab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reminders
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install web-push@3.6.7 --no-save
+      - run: node scripts/send-reminders.mjs
+        env:
+          FIREBASE_PROJECT_ID: personal-to-do-1d186
+          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}

@@ -36,6 +36,28 @@ service cloud.firestore {
       }
     }
 
+    // -------- Web Push subscriptions --------
+    // Push endpoints are only usable by whoever holds the secret VAPID private
+    // key (the scheduler), so storing them here is safe. The scheduler reads
+    // them; expired ones are deleted.
+    match /pushSubs/{subId} {
+      allow read, delete: if true;
+      allow create, update: if request.resource.data.keys().hasOnly(['board', 'endpoint', 'p256dh', 'auth', 'tz', 'createdAt'])
+        && request.resource.data.board is string
+        && request.resource.data.board.size() >= 30
+        && request.resource.data.board.size() <= 80
+        && request.resource.data.endpoint is string
+        && request.resource.data.endpoint.size() <= 1000
+        && request.resource.data.tz is int
+        && request.resource.data.createdAt is int;
+    }
+
+    // -------- Reminder dedup log --------
+    // One doc per (task, fire-time) so the scheduler never sends twice.
+    match /reminderLog/{logId} {
+      allow read, create: if true;
+    }
+
     function validTask(d) {
       return d.keys().hasOnly([
           'title', 'notes', 'listId', 'dueDate', 'time',

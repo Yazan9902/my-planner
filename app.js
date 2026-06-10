@@ -10,6 +10,10 @@ const boardIdKey = "planner-board-id";
 const themeKey = "planner-theme";
 const firebaseVersion = "12.7.0";
 
+// Web Push public key (safe to expose). The matching private key lives only in
+// the GitHub Actions secret that sends the notifications.
+const VAPID_PUBLIC = "BJMWbGa87PpgkaiuMkwktcycVCHoJvaVWy_qPiR_2xwYUYPeQiQKm2f68fmVdw2CJTcvvG8JtMP-BiZCnHscsmk";
+
 /* The board id (private space) lives in the ?board= URL. */
 const boardId = getBoardId();
 const listsKey = `planner-lists:${boardId}`;
@@ -685,6 +689,7 @@ async function connectToFirebase() {
     const app = initializeApp(firebaseConfig);
     const db = fb.getFirestore(app);
     online = { fb, db };
+    refreshPushOnLaunch(); // keep this device's push subscription current
 
     fb.onSnapshot(fb.query(listsCol(), fb.orderBy("createdAt", "asc")), (snap) => {
       lists = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -1302,7 +1307,7 @@ clearDoneButton.addEventListener("click", async () => {
 });
 
 /* ============================================================
-   Reminders (phase 1 — local notifications)
+   Reminders — local (while open) + Web Push (when closed)
    ============================================================ */
 function updateNotifyButton() {
   const granted = "Notification" in window && Notification.permission === "granted";
@@ -1310,17 +1315,75 @@ function updateNotifyButton() {
   notifyToggle.setAttribute("aria-label", granted ? "Reminders on" : "Enable reminders");
 }
 
+// Base64url VAPID key -> Uint8Array for PushManager.
+function urlBase64ToUint8Array(base64) {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+// Subscribe this device to Web Push and store the subscription in Firestore so
+// the cloud scheduler can reach it when the app is closed.
+async function subscribeToPush() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
+      });
+    }
+    await savePushSubscription(sub);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+async function savePushSubscription(sub) {
+  if (!online) return;
+  const json = sub.toJSON();
+  // Deterministic doc id from the endpoint so re-subscribing updates in place.
+  const id = "s" + Math.abs([...sub.endpoint].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7)).toString(36);
+  const subsCol = online.fb.collection(online.db, "pushSubs");
+  await online.fb.setDoc(online.fb.doc(subsCol, id), {
+    board: boardId,
+    endpoint: sub.endpoint,
+    p256dh: json.keys?.p256dh || "",
+    auth: json.keys?.auth || "",
+    // Minutes east of UTC, so the scheduler can resolve your local task times.
+    tz: -new Date().getTimezoneOffset(),
+    createdAt: Date.now(),
+  });
+}
+
 notifyToggle.addEventListener("click", async () => {
-  if (!("Notification" in window)) { showToast("This device doesn't support notifications"); return; }
-  if (Notification.permission === "granted") {
-    showToast("Reminders are on. They fire while the app is open.");
+  if (!("Notification" in window)) {
+    // iOS Safari only exposes notifications to an installed (home-screen) PWA.
+    const iOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    showToast(iOS ? "On iPhone: Share → Add to Home Screen, then open it from there." : "This device doesn't support notifications.");
     return;
   }
-  const result = await Notification.requestPermission();
-  updateNotifyButton();
-  if (result === "granted") showToast("Reminders enabled");
-  else showToast("Reminders blocked in browser settings");
+  if (Notification.permission === "denied") {
+    showToast("Notifications are blocked. Enable them in your device settings.");
+    return;
+  }
+  if (Notification.permission !== "granted") {
+    const result = await Notification.requestPermission();
+    updateNotifyButton();
+    if (result !== "granted") { showToast("Reminders blocked in browser settings"); return; }
+  }
+  const pushed = await subscribeToPush();
+  showToast(pushed ? "Reminders on — they'll reach you even when closed 🔔" : "Reminders on (this device, while open).");
 });
+
+// If permission is already granted, keep the push subscription fresh on launch.
+function refreshPushOnLaunch() {
+  if ("Notification" in window && Notification.permission === "granted") subscribeToPush();
+}
 
 function checkReminders() {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
