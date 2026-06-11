@@ -17,10 +17,11 @@
   --text-soft: #5f5a4f;   /* ~6.3:1  */
   --text-faint: #847d6e;  /* ~4.6:1  (meets AA) */
 
-  /* Brand — calendar blue + event green */
+  /* Brand — calendar blue + event green. Derive tints from --accent so a single
+     override (the accent-color setting) recolors the whole app. */
   --accent: #3f5cf0;
-  --accent-strong: #2f49d6;
-  --accent-soft: #e7ecff;
+  --accent-strong: color-mix(in srgb, var(--accent) 82%, #000000);
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, #ffffff);
   --accent-text: #ffffff;
   --danger: #d2503c;
   --danger-soft: #fbe7e3;
@@ -65,8 +66,8 @@
   --text-faint: #8b8a92;
 
   --accent: #8198ff;
-  --accent-strong: #9aabff;
-  --accent-soft: #2b3354;
+  --accent-strong: color-mix(in srgb, var(--accent) 78%, #ffffff);
+  --accent-soft: color-mix(in srgb, var(--accent) 24%, #11121a);
   --accent-text: #10121b;
   --danger: #ef7c6a;
   --danger-soft: #3a2420;
@@ -912,6 +913,145 @@ input:focus, select:focus, textarea:focus {
 
 /* Hide views' bodies cleanly while no list */
 body.no-list #rename-list { display: none; }
+
+/* ============================================================
+   Subtasks (in the task editor)
+   ============================================================ */
+.subtask-list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.subtask-list:empty { display: none; }
+.subtask-item { display: flex; align-items: center; gap: 10px; }
+.subtask-check {
+  flex: none; width: 22px; height: 22px; border-radius: 6px;
+  border: 2px solid var(--line-strong); background: transparent; color: transparent;
+  display: grid; place-items: center; font-size: 0.7rem;
+  transition: background var(--dur) ease, border-color var(--dur) ease;
+}
+.subtask-item.done .subtask-check { background: var(--done); border-color: var(--done); color: #fff; }
+.subtask-text { flex: 1; min-width: 0; font-size: 0.95rem; word-break: break-word; }
+.subtask-item.done .subtask-text { text-decoration: line-through; color: var(--text-faint); }
+.subtask-del { flex: none; border: none; background: transparent; color: var(--text-faint); padding: 6px; border-radius: 8px; }
+.subtask-del .icon { width: 1rem; height: 1rem; }
+.subtask-del:active { background: var(--tap); }
+.subtask-add { display: flex; gap: 8px; align-items: center; }
+.subtask-add input { flex: 1; }
+.subtask-add-btn {
+  flex: none; width: 46px; height: 46px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--accent);
+  display: grid; place-items: center;
+}
+.subtask-add-btn:active { transform: scale(0.94); }
+/* Progress badge on a task row when it has steps */
+.task-meta .steps-chip { color: var(--text-soft); font-weight: 600; }
+
+/* ============================================================
+   Smart-list chips (Lists view)
+   ============================================================ */
+.list-tab.smart::before { display: none; }
+.list-tab.smart .icon { width: 1em; height: 1em; margin-right: -1px; }
+.lists-divider { flex: none; width: 1px; align-self: stretch; background: var(--line); margin: 4px 2px; }
+
+/* ============================================================
+   Search
+   ============================================================ */
+.search-dialog {
+  margin: 0; max-width: none; width: 100vw; height: 100dvh; max-height: none;
+  border-radius: 0; background: var(--bg);
+}
+.search-dialog::backdrop { background: var(--bg); }
+.search-body {
+  display: flex; flex-direction: column; height: 100dvh;
+  padding: max(12px, env(safe-area-inset-top)) 14px calc(14px + var(--safe-bottom));
+}
+.search-bar {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 999px; padding: 6px 8px 6px 16px; box-shadow: var(--shadow-sm);
+}
+.search-bar-icon { color: var(--text-faint); flex: none; }
+.search-bar input {
+  flex: 1; border: none; background: transparent; min-height: 40px; padding: 8px 0;
+  font-size: 1.05rem; box-shadow: none;
+}
+.search-bar input:focus { outline: none; box-shadow: none; }
+.search-bar .text-button { flex: none; }
+.search-results { margin-top: 16px; overflow-y: auto; flex: 1; }
+.search-empty { margin-top: 40px; text-align: center; color: var(--text-faint); font-size: 0.92rem; padding: 0 24px; }
+.search-empty:empty, .search-results:not(:empty) + .search-empty { display: none; }
+.search-create {
+  margin-top: 14px; width: 100%; justify-content: flex-start; gap: 10px;
+}
+
+/* ============================================================
+   Settings
+   ============================================================ */
+.settings-head { display: flex; align-items: center; justify-content: space-between; }
+.settings-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.settings-buttons .ghost-button { justify-content: flex-start; }
+#backup-status { color: var(--done); }
+#backup-status:empty { display: none; }
+.accent-swatch[aria-checked="true"] { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--text); }
+
+/* ============================================================
+   Month view
+   ============================================================ */
+.month-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; padding: 0 1px; }
+.month-weekdays span {
+  text-align: center; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--text-faint); padding: 2px 0;
+}
+.month-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+}
+.month-cell {
+  position: relative;
+  aspect-ratio: 1 / 1.1;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 10px;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  gap: 3px; padding: 5px 2px 4px;
+  font: inherit; color: var(--text);
+  transition: background var(--dur) ease, border-color var(--dur) ease, transform var(--dur-fast) var(--ease-out);
+}
+.month-cell:active { transform: scale(0.95); }
+.month-cell.other-month { opacity: 0.4; }
+.month-cell.is-today { border-color: var(--accent); }
+.month-cell.is-today .mc-date { background: var(--accent); color: var(--accent-text); }
+.month-cell.selected { background: var(--accent-soft); border-color: var(--accent); }
+.mc-date {
+  font-size: 0.82rem; font-weight: 600; line-height: 1;
+  width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%;
+  font-variant-numeric: tabular-nums;
+}
+.mc-dots { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; min-height: 6px; }
+.mc-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--dot, var(--accent)); display: block; }
+.mc-more { font-size: 0.58rem; color: var(--text-faint); font-weight: 700; }
+
+.month-day { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.month-day-head { display: flex; align-items: center; justify-content: space-between; }
+.month-day-head h3 { margin: 0; font-size: 1.05rem; font-weight: 800; letter-spacing: -0.01em; }
+
+/* ============================================================
+   Drag-to-schedule (Week grid, touch)
+   ============================================================ */
+.week-block { touch-action: none; }
+.week-block.dragging { opacity: 0.85; z-index: 10; box-shadow: var(--shadow-lift); cursor: grabbing; }
+.week-block .resize-handle {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 12px; cursor: ns-resize;
+}
+.week-block .resize-handle::after {
+  content: ""; position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%);
+  width: 18px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.55);
+}
+.week-cell.drop-target { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.week-drag-hint {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(86px + var(--safe-bottom)); z-index: 65;
+  background: var(--text); color: var(--bg); font-size: 0.8rem; font-weight: 700;
+  padding: 7px 14px; border-radius: 999px; box-shadow: var(--shadow-lift);
+  pointer-events: none; opacity: 0; transition: opacity var(--dur) ease;
+}
+.week-drag-hint.show { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }

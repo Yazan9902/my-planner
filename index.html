@@ -96,6 +96,32 @@
         <circle cx="12" cy="12" r="2" />
         <circle cx="19" cy="12" r="2" />
       </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7" />
+        <path d="M21 21l-4.3-4.3" />
+      </symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+      </symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <path d="M3 9h18M3 14h18M8 9v12M13 9v12M3 14h18M8 2v4M16 2v4" />
+      </symbol>
+      <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 6 6 18M6 6l12 12" />
+      </symbol>
+      <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3v12M8 11l4 4 4-4" />
+        <path d="M5 21h14" />
+      </symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 21V9M8 13l4-4 4 4" />
+        <path d="M5 3h14" />
+      </symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />
+      </symbol>
     </svg>
 
     <main class="app-shell">
@@ -107,6 +133,9 @@
         </div>
 
         <div class="header-side">
+          <button id="search-toggle" class="icon-button" type="button" aria-label="Search tasks">
+            <svg class="icon" aria-hidden="true"><use href="#i-search" /></svg>
+          </button>
           <button id="notify-toggle" class="icon-button" type="button" aria-label="Enable reminders" title="Enable reminders">
             <svg class="icon" aria-hidden="true"><use href="#i-bell" /></svg>
           </button>
@@ -148,6 +177,22 @@
         </div>
         <div id="week-allday" class="week-allday"></div>
         <div id="week-grid" class="week-grid"></div>
+      </section>
+
+      <!-- ============ MONTH VIEW ============ -->
+      <section id="view-month" class="view hidden" data-view="month">
+        <div class="week-bar">
+          <button id="month-prev" class="icon-button small" type="button" aria-label="Previous month">
+            <svg class="icon" aria-hidden="true"><use href="#i-chevron-left" /></svg>
+          </button>
+          <button id="month-today" class="text-button" type="button">This month</button>
+          <button id="month-next" class="icon-button small" type="button" aria-label="Next month">
+            <svg class="icon" aria-hidden="true"><use href="#i-chevron-right" /></svg>
+          </button>
+        </div>
+        <div id="month-weekdays" class="month-weekdays"></div>
+        <div id="month-grid" class="month-grid"></div>
+        <div id="month-day" class="month-day"></div>
       </section>
 
       <!-- ============ LISTS VIEW ============ -->
@@ -194,6 +239,10 @@
 
     <!-- Overflow menu (secondary actions, tucked away) -->
     <div id="more-menu" class="more-menu" role="menu" hidden>
+      <button id="settings-button" class="menu-item" type="button" role="menuitem">
+        <svg class="icon" aria-hidden="true"><use href="#i-settings" /></svg>
+        <span>Settings</span>
+      </button>
       <button id="share-button" class="menu-item" type="button" role="menuitem">
         <svg class="icon" aria-hidden="true"><use href="#i-share" /></svg>
         <span>Share planner</span>
@@ -218,6 +267,10 @@
       <button class="tab" data-tab="week" type="button">
         <svg class="icon" aria-hidden="true"><use href="#i-calendar" /></svg>
         <span>Week</span>
+      </button>
+      <button class="tab" data-tab="month" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-grid" /></svg>
+        <span>Month</span>
       </button>
       <button class="tab" data-tab="lists" type="button">
         <svg class="icon" aria-hidden="true"><use href="#i-list" /></svg>
@@ -342,6 +395,17 @@
           </select>
         </label>
 
+        <div class="field">
+          <span>Steps</span>
+          <ul id="subtask-list" class="subtask-list"></ul>
+          <div class="subtask-add">
+            <input id="subtask-input" type="text" maxlength="120" placeholder="Add a step…" autocomplete="off" enterkeyhint="done" />
+            <button id="subtask-add-btn" class="subtask-add-btn" type="button" aria-label="Add step">
+              <svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>
+            </button>
+          </div>
+        </div>
+
         <label class="field">
           <span>Notes</span>
           <textarea id="task-notes" maxlength="500" rows="2" placeholder="Optional details..."></textarea>
@@ -377,6 +441,115 @@
       </form>
     </dialog>
 
+    <!-- ========== Search ========== -->
+    <dialog id="search-dialog" class="dialog search-dialog">
+      <div class="search-body">
+        <div class="search-bar">
+          <svg class="icon search-bar-icon" aria-hidden="true"><use href="#i-search" /></svg>
+          <input id="search-input" type="search" placeholder="Search your tasks…" aria-label="Search tasks" autocomplete="off" enterkeyhint="search" />
+          <button id="search-close" class="text-button" type="button">Close</button>
+        </div>
+        <ul id="search-results" class="task-list search-results"></ul>
+        <div id="search-empty" class="search-empty">
+          <p>Type to search across every task — title, notes, or list.</p>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- ========== Settings ========== -->
+    <dialog id="settings-dialog" class="dialog sheet">
+      <div class="dialog-body settings-body">
+        <div class="settings-head">
+          <h2>Settings</h2>
+          <button id="settings-close" class="icon-button small" type="button" aria-label="Close settings">
+            <svg class="icon" aria-hidden="true"><use href="#i-x" /></svg>
+          </button>
+        </div>
+
+        <div class="field">
+          <span>Accent color</span>
+          <div id="accent-picker" class="color-picker" role="radiogroup" aria-label="Accent color"></div>
+        </div>
+
+        <div class="form-row">
+          <label class="field">
+            <span>Theme</span>
+            <select id="set-theme">
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Week starts</span>
+            <select id="set-weekstart">
+              <option value="1">Monday</option>
+              <option value="0">Sunday</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-row">
+          <label class="field">
+            <span>Time format</span>
+            <select id="set-timeformat">
+              <option value="12">12-hour</option>
+              <option value="24">24-hour</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Default reminder</span>
+            <select id="set-remind">
+              <option value="-1">No reminder</option>
+              <option value="0">At time of task</option>
+              <option value="10">10 min before</option>
+              <option value="30">30 min before</option>
+              <option value="60">1 hour before</option>
+              <option value="1440">1 day before</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Default list for new tasks</span>
+          <select id="set-defaultlist"></select>
+        </label>
+
+        <div class="form-row">
+          <label class="field">
+            <span>Week view starts</span>
+            <select id="set-weekstarthour"></select>
+          </label>
+          <label class="field">
+            <span>Week view ends</span>
+            <select id="set-weekendhour"></select>
+          </label>
+        </div>
+
+        <div class="field">
+          <span>Data &amp; backup</span>
+          <div class="settings-buttons">
+            <button id="export-json" class="ghost-button" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#i-download" /></svg><span>Backup (JSON)</span>
+            </button>
+            <button id="export-csv" class="ghost-button" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#i-download" /></svg><span>Export CSV</span>
+            </button>
+            <button id="export-ics" class="ghost-button" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#i-calendar" /></svg><span>Calendar .ics</span>
+            </button>
+            <button id="import-json" class="ghost-button" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#i-upload" /></svg><span>Restore</span>
+            </button>
+          </div>
+          <input id="import-file" type="file" accept="application/json,.json" hidden />
+          <p id="backup-status" class="quick-hint"></p>
+        </div>
+
+        <p class="quick-hint">An automatic backup is kept on this device every day.</p>
+      </div>
+    </dialog>
+
     <!-- ========== Templates ========== -->
     <template id="task-template">
       <li class="task-item">
@@ -405,6 +578,21 @@
         <h2 class="group-title"></h2>
         <ul class="task-list"></ul>
       </div>
+    </template>
+
+    <template id="subtask-template">
+      <li class="subtask-item">
+        <button class="subtask-check" type="button" aria-label="Toggle step"><svg class="icon" aria-hidden="true"><use href="#i-check" /></svg></button>
+        <span class="subtask-text"></span>
+        <button class="subtask-del" type="button" aria-label="Remove step"><svg class="icon" aria-hidden="true"><use href="#i-x" /></svg></button>
+      </li>
+    </template>
+
+    <template id="month-cell-template">
+      <button class="month-cell" type="button">
+        <span class="mc-date"></span>
+        <span class="mc-dots" aria-hidden="true"></span>
+      </button>
     </template>
   </body>
 </html>

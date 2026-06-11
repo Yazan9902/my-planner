@@ -31,7 +31,7 @@ service cloud.firestore {
         allow update: if validBoard(boardId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'title', 'notes', 'listId', 'dueDate', 'time',
-            'durationMin', 'priority', 'done', 'remindMin', 'repeat'
+            'durationMin', 'priority', 'done', 'remindMin', 'repeat', 'subtasks'
           ]);
       }
     }
@@ -61,7 +61,7 @@ service cloud.firestore {
     function validTask(d) {
       return d.keys().hasOnly([
           'title', 'notes', 'listId', 'dueDate', 'time',
-          'durationMin', 'priority', 'done', 'remindMin', 'repeat', 'createdAt'
+          'durationMin', 'priority', 'done', 'remindMin', 'repeat', 'createdAt', 'subtasks'
         ])
         && d.title is string && d.title.size() >= 1 && d.title.size() <= 120
         && d.notes is string && d.notes.size() <= 500
@@ -73,7 +73,8 @@ service cloud.firestore {
         && d.done is bool
         && d.remindMin is int
         && d.repeat in ['', 'daily', 'weekdays', 'weekly', 'monthly']
-        && d.createdAt is int;
+        && d.createdAt is int
+        && (!('subtasks' in d) || (d.subtasks is list && d.subtasks.size() <= 50));
     }
   }
 }

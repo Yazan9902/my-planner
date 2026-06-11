@@ -22,8 +22,26 @@ const activeKey = `planner-active-list:${boardId}`;
 const notifiedKey = `planner-notified:${boardId}`;
 
 const LIST_COLORS = ["#3f5cf0", "#2f8f5b", "#d84b32", "#c98412", "#9b59d0", "#2bb1c4", "#e05f9a", "#6b7280"];
-const WEEK_START_HOUR = 6;
-const WEEK_END_HOUR = 23;
+let WEEK_START_HOUR = 6;
+let WEEK_END_HOUR = 23;
+
+// White-text-friendly accent presets ("" = theme default).
+const ACCENTS = ["", "#3f5cf0", "#7c4dff", "#2bb1c4", "#2f8f5b", "#e0573f", "#e05f9a", "#0e9aa7", "#5b6470"];
+const settingsKey = `planner-settings:${boardId}`;
+const backupPrefix = `planner-backup:${boardId}:`;
+const DEFAULT_SETTINGS = {
+  accent: "", weekStart: 1, hour12: true, defaultRemind: -1,
+  defaultList: "", weekStartHour: 6, weekEndHour: 23,
+};
+
+// Smart (built-in) lists — dynamic views over all tasks.
+const SMART_LISTS = [
+  { id: "smart:next7", name: "Next 7 days", icon: "i-calendar" },
+  { id: "smart:overdue", name: "Overdue", icon: "i-today" },
+  { id: "smart:high", name: "Priority", icon: "i-flag" },
+  { id: "smart:nodate", name: "No date", icon: "i-inbox" },
+  { id: "smart:all", name: "All", icon: "i-list" },
+];
 
 /* -------------------- Elements -------------------- */
 const $ = (sel) => document.querySelector(sel);
@@ -35,7 +53,7 @@ const notifyToggle = $("#notify-toggle");
 const toast = $("#toast");
 const fab = $("#fab");
 
-const views = { today: $("#view-today"), week: $("#view-week"), lists: $("#view-lists") };
+const views = { today: $("#view-today"), week: $("#view-week"), month: $("#view-month"), lists: $("#view-lists") };
 const tabs = document.querySelectorAll(".tab");
 
 const todayGroups = $("#today-groups");
@@ -66,6 +84,50 @@ const shareButton = $("#share-button");
 const installButton = $("#install-button");
 const moreToggle = $("#more-toggle");
 const moreMenu = $("#more-menu");
+
+/* Search */
+const searchToggle = $("#search-toggle");
+const searchDialog = $("#search-dialog");
+const searchInput = $("#search-input");
+const searchClose = $("#search-close");
+const searchResults = $("#search-results");
+const searchEmpty = $("#search-empty");
+
+/* Settings */
+const settingsButton = $("#settings-button");
+const settingsDialog = $("#settings-dialog");
+const settingsClose = $("#settings-close");
+const accentPicker = $("#accent-picker");
+const setTheme = $("#set-theme");
+const setWeekstart = $("#set-weekstart");
+const setTimeformat = $("#set-timeformat");
+const setRemind = $("#set-remind");
+const setDefaultlist = $("#set-defaultlist");
+const setWeekstarthour = $("#set-weekstarthour");
+const setWeekendhour = $("#set-weekendhour");
+const exportJsonBtn = $("#export-json");
+const exportCsvBtn = $("#export-csv");
+const exportIcsBtn = $("#export-ics");
+const importJsonBtn = $("#import-json");
+const importFile = $("#import-file");
+const backupStatus = $("#backup-status");
+
+/* Subtasks (in task editor) */
+const subtaskList = $("#subtask-list");
+const subtaskInput = $("#subtask-input");
+const subtaskAddBtn = $("#subtask-add-btn");
+
+/* Month view */
+const monthPrev = $("#month-prev");
+const monthNext = $("#month-next");
+const monthTodayBtn = $("#month-today");
+const monthWeekdays = $("#month-weekdays");
+const monthGrid = $("#month-grid");
+const monthDay = $("#month-day");
+
+/* New templates */
+const subtaskTemplate = $("#subtask-template");
+const monthCellTemplate = $("#month-cell-template");
 
 /* Task dialog */
 const taskDialog = $("#task-dialog");
@@ -110,6 +172,7 @@ const weekBlockTemplate = $("#week-block-template");
 const todayGroupTemplate = $("#today-group-template");
 
 /* -------------------- State -------------------- */
+let settings = loadSettings(); // must precede anything that reads it (e.g. startOfWeek)
 let lists = loadLists();
 let tasks = loadTasks();
 let activeListId = localStorage.getItem(activeKey) || lists[0]?.id || null;
@@ -126,6 +189,9 @@ let listDialogMode = "create";
 let editingListId = null;
 let pendingColor = LIST_COLORS[0];
 let notified = new Set(readJSON(notifiedKey, []));
+let editingSubtasks = [];
+let monthAnchor = startOfMonth(new Date());
+let selectedDay = todayStr();
 
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -143,6 +209,8 @@ function loadLists() { return readJSON(listsKey, []); }
 function saveLists() { localStorage.setItem(listsKey, JSON.stringify(lists)); }
 function loadTasks() { return readJSON(tasksKey, []); }
 function saveTasks() { localStorage.setItem(tasksKey, JSON.stringify(tasks)); }
+function loadSettings() { return { ...DEFAULT_SETTINGS, ...readJSON(settingsKey, {}) }; }
+function saveSettings() { localStorage.setItem(settingsKey, JSON.stringify(settings)); }
 function saveNotified() { localStorage.setItem(notifiedKey, JSON.stringify([...notified].slice(-200))); }
 
 function getBoardId() {
@@ -172,12 +240,15 @@ function parseYMD(str) { const [y, m, d] = str.split("-").map(Number); return ne
 
 function startOfWeek(date) {
   const d = new Date(date);
-  const day = (d.getDay() + 6) % 7; // 0 = Monday
+  const ws = settings ? settings.weekStart : 1;
+  const day = (d.getDay() - ws + 7) % 7;
   d.setDate(d.getDate() - day);
   d.setHours(0, 0, 0, 0);
   return d;
 }
+function startOfMonth(date) { const d = new Date(date); d.setDate(1); d.setHours(0, 0, 0, 0); return d; }
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
+function addMonths(date, n) { const d = new Date(date); d.setMonth(d.getMonth() + n); return d; }
 
 function taskDateTime(task) {
   if (!task.dueDate) return null;
@@ -200,7 +271,7 @@ function fmtTime(t) {
   if (!t) return "";
   const [h, m] = t.split(":").map(Number);
   const d = new Date(); d.setHours(h, m);
-  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: settings ? settings.hour12 : true });
 }
 function hhmm(date) { return `${pad(date.getHours())}:${pad(date.getMinutes())}`; }
 
@@ -249,6 +320,23 @@ themeToggle.addEventListener("click", () => {
 });
 
 /* ============================================================
+   Settings — apply preferences across the app
+   ============================================================ */
+function applySettings() {
+  const root = document.documentElement;
+  if (settings.accent) {
+    root.style.setProperty("--accent", settings.accent);
+    root.style.setProperty("--accent-text", "#ffffff");
+  } else {
+    root.style.removeProperty("--accent");
+    root.style.removeProperty("--accent-text");
+  }
+  WEEK_START_HOUR = settings.weekStartHour;
+  WEEK_END_HOUR = settings.weekEndHour;
+}
+applySettings();
+
+/* ============================================================
    Small helpers
    ============================================================ */
 function buzz(ms) { if (!prefersReducedMotion && navigator.vibrate) navigator.vibrate(ms); }
@@ -279,6 +367,7 @@ function hideToast() { toast.classList.remove("show"); }
 const VIEW_TITLES = {
   today: { eyebrow: "Let's plan", title: "Today" },
   week: { eyebrow: "Your schedule", title: "This week" },
+  month: { eyebrow: "Your schedule", title: "This month" },
   lists: { eyebrow: "Organize", title: "Lists" },
 };
 
@@ -294,6 +383,7 @@ function setView(view) {
 function renderCurrent() {
   if (currentView === "today") renderToday();
   else if (currentView === "week") renderWeek();
+  else if (currentView === "month") renderMonth();
   else renderLists();
 }
 
@@ -445,6 +535,10 @@ function buildTaskItem(task, animIndex, animate) {
   }
   if (task.repeat) meta.append(chip("", "i-repeat"));
   if (Number(task.remindMin) >= 0 && task.dueDate) meta.append(chip("", "i-bell"));
+  if (Array.isArray(task.subtasks) && task.subtasks.length) {
+    const done = task.subtasks.filter((s) => s.done).length;
+    meta.append(chip(`${done}/${task.subtasks.length}`, "i-check", "steps-chip"));
+  }
   if (task.notes) meta.append(chip("…"));
 
   li.querySelector(".check-button").setAttribute("aria-label", task.done ? "Mark not done" : "Mark done");
@@ -474,8 +568,10 @@ function chip(text, iconId, extraClass = "") {
 /* ============================================================
    Render: Week view
    ============================================================ */
+let weekDays = [];
 function renderWeek() {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekAnchor, i));
+  weekDays = days;
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
   /* Header label */
@@ -569,8 +665,14 @@ function renderWeek() {
       block.style.width = `${colW - 4}px`;
       block.style.top = `${headerH + topOffset + 1}px`;
       block.style.height = `${Math.max(18, (dur / 60) * hourHeight - 2)}px`;
-      block.innerHTML = `<span class="bt">${fmtTime(t.time)}</span>${t.title}`;
-      block.addEventListener("click", (e) => { e.stopPropagation(); openTaskDialog("edit", t.id); });
+      const bt = document.createElement("span");
+      bt.className = "bt";
+      bt.textContent = fmtTime(t.time);
+      block.append(bt, document.createTextNode(t.title));
+      const handle = document.createElement("div");
+      handle.className = "resize-handle";
+      block.append(handle);
+      // Tap = edit; long-press = drag (handled by the unified pointer logic).
       weekGrid.append(block);
     });
   });
@@ -589,20 +691,242 @@ weekGrid.addEventListener("click", (event) => {
   openTaskDialog("create", null, { date: c.dataset.date, time: `${pad(Number(c.dataset.hour))}:00` });
 });
 
+/* -------------------- Drag-to-schedule & resize (touch) -------------------- */
+let wdrag = null;
+let weekHint = null;
+const HOUR_PX = 44;
+
+function weekGeom() {
+  const r = weekGrid.getBoundingClientRect();
+  const labelW = 44;
+  const headerH = weekGrid.querySelector(".week-dayhead")?.offsetHeight || 44;
+  return { r, labelW, headerH, colW: (r.width - labelW) / 7 };
+}
+function showWeekHint(text) {
+  if (!weekHint) {
+    weekHint = document.createElement("div");
+    weekHint.className = "week-drag-hint";
+    document.body.append(weekHint);
+  }
+  weekHint.textContent = text;
+  weekHint.classList.add("show");
+}
+function hideWeekHint() { if (weekHint) weekHint.classList.remove("show"); }
+function clearDropTargets() { weekGrid.querySelectorAll(".week-cell.drop-target").forEach((c) => c.classList.remove("drop-target")); }
+
+function posToSlot(clientX, clientY) {
+  const g = weekGeom();
+  let di = Math.floor((clientX - g.r.left - g.labelW) / g.colW);
+  di = Math.max(0, Math.min(6, di));
+  let mins = Math.round(((clientY - g.r.top - g.headerH) / HOUR_PX) * 60 / 15) * 15;
+  const span = (WEEK_END_HOUR - WEEK_START_HOUR + 1) * 60;
+  mins = Math.max(0, Math.min(span - 15, mins));
+  return { di, mins, g };
+}
+
+weekGrid.addEventListener("pointerdown", (event) => {
+  const block = event.target.closest(".week-block");
+  if (!block) return;
+  const id = block.dataset.id;
+  const task = tasks.find((t) => t.id === id);
+  if (!task) return;
+  if (event.target.closest(".resize-handle")) {
+    wdrag = { mode: "resize", block, id, dur: Number(task.durationMin) || 30, pointerId: event.pointerId };
+    try { block.setPointerCapture(event.pointerId); } catch {}
+    block.classList.add("dragging");
+    event.preventDefault();
+    return;
+  }
+  wdrag = { mode: "pending", block, id, startX: event.clientX, startY: event.clientY, pointerId: event.pointerId };
+  try { block.setPointerCapture(event.pointerId); } catch {}
+  wdrag.timer = setTimeout(() => { if (wdrag && wdrag.mode === "pending") beginWeekMove(); }, 180);
+});
+
+function beginWeekMove() {
+  if (!wdrag) return;
+  wdrag.mode = "move";
+  wdrag.moved = true;
+  wdrag.block.classList.add("dragging");
+  buzz(12);
+}
+
+weekGrid.addEventListener("pointermove", (event) => {
+  if (!wdrag) return;
+  if (wdrag.mode === "pending") {
+    if (Math.hypot(event.clientX - wdrag.startX, event.clientY - wdrag.startY) > 10) {
+      clearTimeout(wdrag.timer);
+      beginWeekMove();
+    } else return;
+  }
+  if (wdrag.mode === "move") {
+    const { di, mins, g } = posToSlot(event.clientX, event.clientY);
+    wdrag.di = di; wdrag.mins = mins;
+    wdrag.block.style.left = `${g.labelW + di * g.colW + 2}px`;
+    wdrag.block.style.top = `${g.headerH + (mins / 60) * HOUR_PX + 1}px`;
+    const total = WEEK_START_HOUR * 60 + mins;
+    const date = ymd(weekDays[di]);
+    clearDropTargets();
+    const cell = weekGrid.querySelector(`.week-cell[data-date="${date}"][data-hour="${Math.floor(total / 60)}"]`);
+    if (cell) cell.classList.add("drop-target");
+    showWeekHint(`${weekDays[di].toLocaleDateString(undefined, { weekday: "short" })} · ${fmtTime(pad(Math.floor(total / 60)) + ":" + pad(total % 60))}`);
+  } else if (wdrag.mode === "resize") {
+    const g = weekGeom();
+    const top = parseFloat(wdrag.block.style.top) || 0;
+    let dur = Math.round(((event.clientY - g.r.top - top) / HOUR_PX) * 60 / 15) * 15;
+    dur = Math.max(15, Math.min(600, dur));
+    wdrag.dur = dur;
+    wdrag.block.style.height = `${Math.max(18, (dur / 60) * HOUR_PX - 2)}px`;
+    showWeekHint(`${dur} min`);
+  }
+});
+
+function endWeekDrag() {
+  if (!wdrag) return;
+  const d = wdrag;
+  wdrag = null;
+  clearTimeout(d.timer);
+  try { d.block.releasePointerCapture(d.pointerId); } catch {}
+  hideWeekHint();
+  clearDropTargets();
+  d.block.classList.remove("dragging");
+  if (d.mode === "pending") { openTaskDialog("edit", d.id); return; }
+  if (d.mode === "move") {
+    const total = WEEK_START_HOUR * 60 + d.mins;
+    const time = `${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
+    updateTask(d.id, { dueDate: ymd(weekDays[d.di]), time });
+    buzz(8);
+  } else if (d.mode === "resize") {
+    updateTask(d.id, { durationMin: d.dur });
+    buzz(8);
+  }
+}
+weekGrid.addEventListener("pointerup", endWeekDrag);
+weekGrid.addEventListener("pointercancel", () => { if (wdrag) { clearTimeout(wdrag.timer); const b = wdrag.block; wdrag = null; hideWeekHint(); clearDropTargets(); b.classList.remove("dragging"); renderWeek(); } });
+
+/* ============================================================
+   Render: Month view
+   ============================================================ */
+function renderMonth() {
+  const monthName = monthAnchor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const isThisMonth = startOfMonth(new Date()).getTime() === monthAnchor.getTime();
+  monthTodayBtn.textContent = isThisMonth ? "This month" : monthName;
+  headerTitle.textContent = isThisMonth ? "This month" : monthName;
+
+  // Weekday header respecting week-start preference.
+  monthWeekdays.replaceChildren();
+  const refMon = startOfWeek(new Date());
+  for (let i = 0; i < 7; i++) {
+    const span = document.createElement("span");
+    span.textContent = addDays(refMon, i).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2);
+    monthWeekdays.append(span);
+  }
+
+  const gridStart = startOfWeek(startOfMonth(monthAnchor));
+  const today = todayStr();
+  const month = monthAnchor.getMonth();
+
+  monthGrid.replaceChildren();
+  for (let i = 0; i < 42; i++) {
+    const day = addDays(gridStart, i);
+    const ds = ymd(day);
+    const cell = monthCellTemplate.content.firstElementChild.cloneNode(true);
+    cell.dataset.date = ds;
+    if (day.getMonth() !== month) cell.classList.add("other-month");
+    if (ds === today) cell.classList.add("is-today");
+    if (ds === selectedDay) cell.classList.add("selected");
+    cell.querySelector(".mc-date").textContent = day.getDate();
+
+    const dayTasks = tasks.filter((t) => t.dueDate === ds);
+    const dots = cell.querySelector(".mc-dots");
+    dayTasks.slice(0, 4).forEach((t) => {
+      const i2 = document.createElement("i");
+      i2.style.setProperty("--dot", t.done ? "var(--text-faint)" : colorForList(t.listId));
+      dots.append(i2);
+    });
+    if (dayTasks.length > 4) {
+      const more = document.createElement("span");
+      more.className = "mc-more";
+      more.textContent = `+${dayTasks.length - 4}`;
+      dots.append(more);
+    }
+    monthGrid.append(cell);
+  }
+  renderMonthDay();
+}
+
+function renderMonthDay() {
+  monthDay.replaceChildren();
+  const head = document.createElement("div");
+  head.className = "month-day-head";
+  const h = document.createElement("h3");
+  h.textContent = relativeDayLabel(selectedDay);
+  const add = document.createElement("button");
+  add.className = "icon-text-button";
+  add.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg><span>Add</span>`;
+  add.addEventListener("click", () => openTaskDialog("create", null, { date: selectedDay }));
+  head.append(h, add);
+  monthDay.append(head);
+
+  const dayTasks = tasks
+    .filter((t) => t.dueDate === selectedDay)
+    .sort((a, b) => (!!a.done !== !!b.done ? (a.done ? 1 : -1) : byTimePriority(a, b)));
+  const ul = document.createElement("ul");
+  ul.className = "task-list";
+  if (dayTasks.length === 0) {
+    const p = document.createElement("p");
+    p.className = "search-empty";
+    p.style.marginTop = "8px";
+    p.textContent = "Nothing planned. Tap Add to plan something.";
+    monthDay.append(p);
+  } else {
+    let i = 0;
+    dayTasks.forEach((t) => ul.append(buildTaskItem(t, i++, false)));
+    monthDay.append(ul);
+  }
+  knownIds = new Set(tasks.map((t) => t.id));
+}
+
+monthGrid.addEventListener("click", (event) => {
+  const cell = event.target.closest(".month-cell");
+  if (!cell) return;
+  selectedDay = cell.dataset.date;
+  buzz(5);
+  renderMonth();
+});
+attachSwipe(monthDay);
+
+monthPrev.addEventListener("click", () => { monthAnchor = addMonths(monthAnchor, -1); buzz(6); renderMonth(); });
+monthNext.addEventListener("click", () => { monthAnchor = addMonths(monthAnchor, 1); buzz(6); renderMonth(); });
+monthTodayBtn.addEventListener("click", () => { monthAnchor = startOfMonth(new Date()); selectedDay = todayStr(); buzz(6); renderMonth(); });
+
 /* ============================================================
    Render: Lists view
    ============================================================ */
+function smartFilter(id) {
+  const today = todayStr();
+  const in7 = ymd(addDays(new Date(), 6));
+  if (id === "smart:next7") return tasks.filter((t) => t.dueDate && t.dueDate >= today && t.dueDate <= in7);
+  if (id === "smart:overdue") return tasks.filter((t) => !t.done && t.dueDate && t.dueDate < today);
+  if (id === "smart:high") return tasks.filter((t) => t.priority === "high");
+  if (id === "smart:nodate") return tasks.filter((t) => !t.dueDate);
+  if (id === "smart:all") return tasks.slice();
+  return [];
+}
+
 function renderLists() {
   renderListTabs();
 
+  const smart = isSmart(activeListId) ? SMART_LISTS.find((s) => s.id === activeListId) : null;
   const current = activeList();
-  listTitle.textContent = current ? current.name : "Your tasks";
-  renameListButton.hidden = !current;
-  document.body.classList.toggle("no-list", lists.length === 0);
+  listTitle.textContent = smart ? smart.name : current ? current.name : "Your tasks";
+  renameListButton.hidden = !current; // only real lists are editable
+  document.body.classList.toggle("no-list", lists.length === 0 && !smart);
 
-  const listTasks = current
-    ? tasks.filter((t) => t.listId === activeListId)
-    : tasks.filter((t) => !t.listId || !listById(t.listId));
+  const listTasks = smart
+    ? smartFilter(activeListId)
+    : current
+      ? tasks.filter((t) => t.listId === activeListId)
+      : tasks.filter((t) => !t.listId || !listById(t.listId));
 
   let visible = listTasks;
   if (activeFilter === "active") visible = listTasks.filter((t) => !t.done);
@@ -625,7 +949,11 @@ function renderLists() {
   if (isEmpty) {
     const h3 = listsEmpty.querySelector("h3");
     const p = listsEmpty.querySelector("p");
-    if (lists.length === 0) {
+    if (smart) {
+      h3.textContent = "Nothing here";
+      p.textContent = "No tasks match this view right now.";
+      emptyAction.hidden = true;
+    } else if (lists.length === 0) {
       h3.textContent = "No lists yet";
       p.textContent = "Create a list to organize your tasks.";
       emptyAction.hidden = false;
@@ -643,7 +971,24 @@ function renderLists() {
 }
 
 function renderListTabs() {
+  const prevScroll = listsTabs.scrollLeft;
   listsTabs.replaceChildren();
+  // Built-in smart lists first.
+  SMART_LISTS.forEach((s) => {
+    const tab = listTabTemplate.content.firstElementChild.cloneNode(true);
+    tab.classList.add("smart");
+    tab.dataset.id = s.id;
+    tab.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#${s.icon}" /></svg>${s.name}`;
+    if (s.id === activeListId) tab.setAttribute("aria-current", "true");
+    listsTabs.append(tab);
+  });
+  if (lists.length) {
+    const divider = document.createElement("span");
+    divider.className = "lists-divider";
+    divider.setAttribute("aria-hidden", "true");
+    listsTabs.append(divider);
+  }
+  // User lists.
   lists.forEach((list) => {
     const tab = listTabTemplate.content.firstElementChild.cloneNode(true);
     tab.textContent = list.name;
@@ -652,8 +997,9 @@ function renderListTabs() {
     if (list.id === activeListId) tab.setAttribute("aria-current", "true");
     listsTabs.append(tab);
   });
-  const activeTab = listsTabs.querySelector('[aria-current="true"]');
-  if (activeTab) activeTab.scrollIntoView({ inline: "nearest", block: "nearest" });
+  // Preserve horizontal scroll across re-renders (don't yank the smart lists
+  // off-screen by forcing the active tab into view).
+  listsTabs.scrollLeft = prevScroll;
 }
 
 function moveFilterPill() {
@@ -695,8 +1041,8 @@ async function connectToFirebase() {
       lists = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       saveLists();
       // Ensure a sensible active list once lists arrive (covers first-run where
-      // activeListId is null because localStorage was empty before sync).
-      if (lists.length && (!activeListId || !lists.some((l) => l.id === activeListId))) {
+      // activeListId is null). Preserve smart-list selections.
+      if (lists.length && !isSmart(activeListId) && (!activeListId || !lists.some((l) => l.id === activeListId))) {
         activeListId = lists[0].id;
       }
       if (activeListId) localStorage.setItem(activeKey, activeListId);
@@ -757,12 +1103,26 @@ async function deleteList(id) {
    Task CRUD
    ============================================================ */
 function taskFields(t) {
-  return {
+  const f = {
     title: t.title, notes: t.notes || "", listId: t.listId || "",
     dueDate: t.dueDate || "", time: t.time || "", durationMin: Number(t.durationMin) || 0,
     priority: t.priority || "med", done: !!t.done, remindMin: Number(t.remindMin),
     repeat: t.repeat || "", createdAt: t.createdAt,
   };
+  // Only include subtasks when present so tasks without steps stay compatible
+  // with rules that predate the feature.
+  const subs = sanitizeSubtasks(t.subtasks);
+  if (subs.length) f.subtasks = subs;
+  return f;
+}
+
+function sanitizeSubtasks(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.slice(0, 50).map((s) => ({
+    id: String(s.id || crypto.randomUUID()),
+    title: String(s.title || "").slice(0, 120),
+    done: !!s.done,
+  })).filter((s) => s.title);
 }
 
 async function createTask(data) {
@@ -973,25 +1333,71 @@ function openTaskDialog(mode, id = null, prefill = {}) {
     taskRepeat.value = t.repeat || "";
     taskRemind.value = String(t.remindMin ?? -1);
     taskNotes.value = t.notes || "";
+    editingSubtasks = sanitizeSubtasks(t.subtasks);
     taskDeleteBtn.hidden = false;
     snoozeRow.hidden = false;
   } else {
     taskDialogTitle.textContent = "New task";
     taskTitleInput.value = prefill.title || "";
-    taskListSelect.value = prefill.listId || activeListId || lists[0]?.id || "";
+    taskListSelect.value = prefill.listId || defaultListId();
     taskPriority.value = prefill.priority || "med";
     taskDate.value = prefill.date || "";
     taskTime.value = prefill.time || "";
     taskDuration.value = String(prefill.durationMin ?? 30);
     taskRepeat.value = prefill.repeat || "";
-    taskRemind.value = String(prefill.remindMin ?? -1);
+    taskRemind.value = String(prefill.remindMin ?? settings.defaultRemind ?? -1);
     taskNotes.value = prefill.notes || "";
+    editingSubtasks = [];
     taskDeleteBtn.hidden = true;
     snoozeRow.hidden = true;
   }
+  renderSubtaskEditor();
+  if (subtaskInput) subtaskInput.value = "";
   taskDialog.showModal();
   taskTitleInput.focus();
 }
+
+function isSmart(id) { return typeof id === "string" && id.startsWith("smart:"); }
+
+// The list a new task should default to (never a smart list).
+function defaultListId() {
+  if (settings.defaultList && lists.some((l) => l.id === settings.defaultList)) return settings.defaultList;
+  if (activeListId && !isSmart(activeListId) && lists.some((l) => l.id === activeListId)) return activeListId;
+  return lists[0]?.id || "";
+}
+
+/* -------------------- Subtask editor -------------------- */
+function renderSubtaskEditor() {
+  subtaskList.replaceChildren();
+  editingSubtasks.forEach((s, i) => {
+    const li = subtaskTemplate.content.firstElementChild.cloneNode(true);
+    li.classList.toggle("done", !!s.done);
+    li.querySelector(".subtask-text").textContent = s.title;
+    li.querySelector(".subtask-check").addEventListener("click", () => {
+      editingSubtasks[i].done = !editingSubtasks[i].done;
+      renderSubtaskEditor();
+      buzz(6);
+    });
+    li.querySelector(".subtask-del").addEventListener("click", () => {
+      editingSubtasks.splice(i, 1);
+      renderSubtaskEditor();
+    });
+    subtaskList.append(li);
+  });
+}
+
+function addSubtaskFromInput() {
+  const title = subtaskInput.value.trim();
+  if (!title) return;
+  editingSubtasks.push({ id: crypto.randomUUID(), title, done: false });
+  subtaskInput.value = "";
+  renderSubtaskEditor();
+  subtaskInput.focus();
+}
+subtaskAddBtn.addEventListener("click", addSubtaskFromInput);
+subtaskInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); addSubtaskFromInput(); }
+});
 
 snoozeRow.addEventListener("click", (event) => {
   const chip = event.target.closest(".snooze-chip");
@@ -1161,7 +1567,7 @@ quickForm.addEventListener("submit", async (event) => {
   if (!p.title) p.title = raw; // fall back to the raw text if parsing emptied it
   await createTask({
     title: p.title,
-    listId: activeListId || lists[0]?.id || "",
+    listId: defaultListId(),
     priority: p.priority,
     dueDate: p.dueDate,
     time: p.time,
@@ -1192,6 +1598,8 @@ quickMoreBtn.addEventListener("click", () => {
 taskForm.addEventListener("submit", async (event) => {
   const title = taskTitleInput.value.trim();
   if (!title) { event.preventDefault(); taskTitleInput.focus(); return; }
+  // Fold an unsubmitted step in the input into the list.
+  if (subtaskInput.value.trim()) addSubtaskFromInput();
   const data = {
     title,
     listId: taskListSelect.value || "",
@@ -1203,6 +1611,11 @@ taskForm.addEventListener("submit", async (event) => {
     remindMin: Number(taskRemind.value),
     notes: taskNotes.value.trim(),
   };
+  // Include subtasks only when there are steps now, or there were before (to
+  // persist clearing them). Keeps no-step tasks compatible with older rules.
+  const subs = sanitizeSubtasks(editingSubtasks);
+  const hadSubs = taskDialogMode === "edit" && (tasks.find((t) => t.id === editingTaskId)?.subtasks || []).length;
+  if (subs.length || hadSubs) data.subtasks = subs;
   if (taskDialogMode === "edit" && editingTaskId) await updateTask(editingTaskId, data);
   else await createTask(data);
   buzz(8);
@@ -1297,13 +1710,82 @@ filterButtons.forEach((button) => {
 });
 
 clearDoneButton.addEventListener("click", async () => {
-  const current = activeList();
-  const doneTasks = tasks.filter((t) => t.done && (current ? t.listId === activeListId : true));
+  // Clear done within the currently shown set (real list, smart list, or no-list).
+  let doneTasks;
+  if (isSmart(activeListId)) doneTasks = smartFilter(activeListId).filter((t) => t.done);
+  else if (activeList()) doneTasks = tasks.filter((t) => t.done && t.listId === activeListId);
+  else doneTasks = tasks.filter((t) => t.done && (!t.listId || !listById(t.listId)));
   if (doneTasks.length === 0) return;
   buzz(10);
   if (online) await Promise.all(doneTasks.map((t) => removeTask(t.id)));
   else { tasks = tasks.filter((t) => !doneTasks.includes(t)); saveTasks(); renderCurrent(); }
   showToast(`Cleared ${doneTasks.length} done task${doneTasks.length > 1 ? "s" : ""}`);
+});
+
+/* ============================================================
+   Search
+   ============================================================ */
+function openSearch() {
+  searchInput.value = "";
+  renderSearch("");
+  searchDialog.showModal();
+  setTimeout(() => searchInput.focus(), 50);
+}
+
+function renderSearch(query) {
+  const q = query.trim().toLowerCase();
+  searchResults.replaceChildren();
+  if (!q) {
+    searchEmpty.textContent = "Type to search across every task — title, notes, or list.";
+    return;
+  }
+  const matches = tasks
+    .map((t) => {
+      const title = (t.title || "").toLowerCase();
+      const notes = (t.notes || "").toLowerCase();
+      const listName = (listById(t.listId)?.name || "").toLowerCase();
+      let score = 0;
+      if (title.startsWith(q)) score = 3;
+      else if (title.includes(q)) score = 2;
+      else if (listName.includes(q) || notes.includes(q)) score = 1;
+      else if ((t.subtasks || []).some((s) => (s.title || "").toLowerCase().includes(q))) score = 1;
+      return { t, score };
+    })
+    .filter((m) => m.score > 0)
+    .sort((a, b) => b.score - a.score || (b.t.createdAt - a.t.createdAt))
+    .slice(0, 50);
+
+  // Offer to create a task from the query.
+  const create = document.createElement("button");
+  create.type = "button";
+  create.className = "ghost-button search-create";
+  create.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg><span>Create “${escapeHtml(query.trim())}”</span>`;
+  create.addEventListener("click", () => { searchDialog.close(); openTaskDialog("create", null, { title: query.trim() }); });
+
+  if (matches.length === 0) {
+    searchEmpty.textContent = "No matching tasks.";
+    searchResults.append(create);
+    return;
+  }
+  searchEmpty.textContent = "";
+  let i = 0;
+  matches.forEach((m) => searchResults.append(buildTaskItem(m.t, i++, false)));
+  searchResults.append(create);
+  knownIds = new Set(tasks.map((t) => t.id));
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+searchToggle.addEventListener("click", () => { buzz(6); openSearch(); });
+searchClose.addEventListener("click", () => searchDialog.close());
+searchInput.addEventListener("input", () => renderSearch(searchInput.value));
+searchResults.addEventListener("click", (event) => {
+  const li = event.target.closest(".task-item");
+  if (!li) return;
+  if (event.target.closest(".check-button")) { toggleTask(li.dataset.id); renderSearch(searchInput.value); }
+  else { searchDialog.close(); openTaskDialog("edit", li.dataset.id); }
 });
 
 /* ============================================================
@@ -1454,16 +1936,207 @@ installButton.addEventListener("click", async () => {
 window.addEventListener("appinstalled", () => { installButton.hidden = true; showToast("Installed — find it on your home screen"); });
 
 /* ============================================================
+   Settings panel
+   ============================================================ */
+function buildAccentPicker() {
+  accentPicker.replaceChildren();
+  ACCENTS.forEach((color) => {
+    const sw = document.createElement("button");
+    sw.type = "button";
+    sw.className = "color-swatch accent-swatch";
+    sw.setAttribute("role", "radio");
+    if (color) {
+      sw.style.background = color;
+      sw.setAttribute("aria-label", color);
+    } else {
+      sw.style.background = "conic-gradient(from 90deg, #3f5cf0, #7c4dff, #2bb1c4, #2f8f5b, #e0573f, #e05f9a, #3f5cf0)";
+      sw.setAttribute("aria-label", "Default (follows theme)");
+    }
+    sw.setAttribute("aria-checked", settings.accent === color ? "true" : "false");
+    sw.addEventListener("click", () => {
+      settings.accent = color;
+      saveSettings();
+      applySettings();
+      accentPicker.querySelectorAll(".accent-swatch").forEach((s) => s.setAttribute("aria-checked", "false"));
+      sw.setAttribute("aria-checked", "true");
+      buzz(6);
+    });
+    accentPicker.append(sw);
+  });
+}
+
+function fillHourOptions(select, from, to, selected) {
+  select.replaceChildren();
+  for (let h = from; h <= to; h++) {
+    const opt = document.createElement("option");
+    opt.value = String(h);
+    const d = new Date(); d.setHours(h, 0);
+    opt.textContent = d.toLocaleTimeString(undefined, { hour: "numeric", hour12: settings.hour12 });
+    if (h === selected) opt.selected = true;
+    select.append(opt);
+  }
+}
+
+function fillDefaultListOptions() {
+  setDefaultlist.replaceChildren();
+  const none = document.createElement("option");
+  none.value = ""; none.textContent = "First list";
+  setDefaultlist.append(none);
+  lists.forEach((l) => {
+    const opt = document.createElement("option");
+    opt.value = l.id; opt.textContent = l.name;
+    setDefaultlist.append(opt);
+  });
+  setDefaultlist.value = settings.defaultList || "";
+}
+
+function openSettings() {
+  buildAccentPicker();
+  setTheme.value = localStorage.getItem(themeKey) || "system";
+  setWeekstart.value = String(settings.weekStart);
+  setTimeformat.value = settings.hour12 ? "12" : "24";
+  setRemind.value = String(settings.defaultRemind);
+  fillDefaultListOptions();
+  fillHourOptions(setWeekstarthour, 0, 12, settings.weekStartHour);
+  fillHourOptions(setWeekendhour, 13, 23, settings.weekEndHour);
+  backupStatus.textContent = "";
+  settingsDialog.showModal();
+}
+function applyAndRerender() {
+  saveSettings();
+  applySettings();
+  renderCurrent();
+}
+
+settingsButton.addEventListener("click", () => { closeMoreMenu(); openSettings(); });
+settingsClose.addEventListener("click", () => settingsDialog.close());
+
+setTheme.addEventListener("change", () => {
+  if (setTheme.value === "system") { localStorage.removeItem(themeKey); applyTheme(currentTheme()); }
+  else { localStorage.setItem(themeKey, setTheme.value); applyTheme(setTheme.value); }
+});
+setWeekstart.addEventListener("change", () => { settings.weekStart = Number(setWeekstart.value); weekAnchor = startOfWeek(new Date()); applyAndRerender(); });
+setTimeformat.addEventListener("change", () => { settings.hour12 = setTimeformat.value === "12"; applyAndRerender(); });
+setRemind.addEventListener("change", () => { settings.defaultRemind = Number(setRemind.value); saveSettings(); });
+setDefaultlist.addEventListener("change", () => { settings.defaultList = setDefaultlist.value; saveSettings(); });
+setWeekstarthour.addEventListener("change", () => { settings.weekStartHour = Number(setWeekstarthour.value); applyAndRerender(); });
+setWeekendhour.addEventListener("change", () => { settings.weekEndHour = Number(setWeekendhour.value); applyAndRerender(); });
+
+/* ============================================================
+   Export / Import / Backup
+   ============================================================ */
+function downloadFile(name, mime, content) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function stamp() { return new Date().toISOString().slice(0, 10); }
+
+function exportJSON() {
+  const data = { app: "my-planner", version: 1, exportedAt: Date.now(), board: boardId, lists, tasks };
+  downloadFile(`planner-backup-${stamp()}.json`, "application/json", JSON.stringify(data, null, 2));
+  backupStatus.textContent = "Backup downloaded ✓";
+}
+function csvCell(v) { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
+function exportCSV() {
+  const head = ["Title", "List", "Date", "Time", "Duration(min)", "Priority", "Done", "Repeat", "Remind(min)", "Steps", "Notes"];
+  const rows = tasks.map((t) => [
+    t.title, listById(t.listId)?.name || "", t.dueDate || "", t.time || "", t.durationMin || 0,
+    t.priority || "", t.done ? "yes" : "no", t.repeat || "", t.remindMin,
+    (t.subtasks || []).map((s) => (s.done ? "[x] " : "[ ] ") + s.title).join(" | "), t.notes || "",
+  ].map(csvCell).join(","));
+  downloadFile(`planner-tasks-${stamp()}.csv`, "text/csv", [head.join(","), ...rows].join("\n"));
+  backupStatus.textContent = "CSV downloaded ✓";
+}
+function icsDate(dateStr, timeStr) {
+  const [y, m, d] = dateStr.split("-");
+  if (!timeStr) return { allDay: true, v: `${y}${m}${d}` };
+  const [hh, mm] = timeStr.split(":");
+  return { allDay: false, v: `${y}${m}${d}T${hh}${mm}00` };
+}
+function exportICS() {
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//My Planner//EN", "CALSCALE:GREGORIAN"];
+  tasks.filter((t) => t.dueDate).forEach((t) => {
+    const start = icsDate(t.dueDate, t.time);
+    lines.push("BEGIN:VEVENT", `UID:${t.id}@my-planner`, `DTSTAMP:${stamp().replace(/-/g, "")}T000000`);
+    if (start.allDay) lines.push(`DTSTART;VALUE=DATE:${start.v}`);
+    else {
+      lines.push(`DTSTART:${start.v}`);
+      const dur = Number(t.durationMin) || 30;
+      lines.push(`DURATION:PT${dur}M`);
+    }
+    lines.push(`SUMMARY:${(t.title || "").replace(/\n/g, " ")}`);
+    if (t.notes) lines.push(`DESCRIPTION:${t.notes.replace(/\n/g, " ")}`);
+    lines.push("END:VEVENT");
+  });
+  lines.push("END:VCALENDAR");
+  downloadFile(`planner-${stamp()}.ics`, "text/calendar", lines.join("\r\n"));
+  backupStatus.textContent = "Calendar file downloaded ✓";
+}
+
+async function importData(json) {
+  let data;
+  try { data = JSON.parse(json); } catch { backupStatus.textContent = "That file isn't valid JSON."; return; }
+  const inLists = Array.isArray(data.lists) ? data.lists : [];
+  const inTasks = Array.isArray(data.tasks) ? data.tasks : [];
+  if (!inLists.length && !inTasks.length) { backupStatus.textContent = "No tasks found in that file."; return; }
+  if (!confirm(`Restore ${inTasks.length} task(s) and ${inLists.length} list(s)? This merges into your current planner.`)) return;
+  if (online) {
+    await Promise.all(inLists.map((l) => online.fb.setDoc(online.fb.doc(listsCol(), String(l.id || crypto.randomUUID())), listFields({ ...l, createdAt: l.createdAt || Date.now() }))));
+    await Promise.all(inTasks.map((t) => online.fb.setDoc(online.fb.doc(tasksCol(), String(t.id || crypto.randomUUID())), taskFields({ ...t, createdAt: t.createdAt || Date.now() }))));
+  } else {
+    inLists.forEach((l) => { const id = String(l.id || crypto.randomUUID()); if (!lists.some((x) => x.id === id)) lists.push({ id, ...listFields({ ...l, createdAt: l.createdAt || Date.now() }) }); });
+    inTasks.forEach((t) => { const id = String(t.id || crypto.randomUUID()); const i = tasks.findIndex((x) => x.id === id); const rec = { id, ...taskFields({ ...t, createdAt: t.createdAt || Date.now() }) }; if (i >= 0) tasks[i] = rec; else tasks.unshift(rec); });
+    saveLists(); saveTasks(); renderCurrent();
+  }
+  backupStatus.textContent = `Restored ${inTasks.length} task(s) ✓`;
+  buzz(12);
+}
+
+exportJsonBtn.addEventListener("click", exportJSON);
+exportCsvBtn.addEventListener("click", exportCSV);
+exportIcsBtn.addEventListener("click", exportICS);
+importJsonBtn.addEventListener("click", () => importFile.click());
+importFile.addEventListener("change", () => {
+  const file = importFile.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { importData(String(reader.result)); importFile.value = ""; };
+  reader.readAsText(file);
+});
+
+// Keep a daily local snapshot (last 5) so data is never one mistake away from gone.
+function runDailyBackup() {
+  try {
+    const key = backupPrefix + stamp();
+    if (!localStorage.getItem(key) && (lists.length || tasks.length)) {
+      localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), lists, tasks }));
+    }
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith(backupPrefix)).sort();
+    while (keys.length > 5) localStorage.removeItem(keys.shift());
+  } catch {}
+}
+
+/* ============================================================
    Keyboard shortcuts (desktop convenience)
    ============================================================ */
 document.addEventListener("keydown", (event) => {
+  // Command palette: ⌘K / Ctrl+K opens search from anywhere.
+  if ((event.metaKey || event.ctrlKey) && (event.key === "k" || event.key === "K")) {
+    event.preventDefault();
+    if (!searchDialog.open) openSearch();
+    return;
+  }
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || "");
   const anyDialogOpen = document.querySelector("dialog[open]");
   if (typing || anyDialogOpen || event.metaKey || event.ctrlKey || event.altKey) return;
-  // n or / -> quick capture; t/w/l -> switch views
   if (event.key === "n" || event.key === "/") { event.preventDefault(); openQuickAdd(); }
   else if (event.key === "t") setView("today");
   else if (event.key === "w") setView("week");
+  else if (event.key === "m") setView("month");
   else if (event.key === "l") setView("lists");
 });
 
@@ -1473,6 +2146,7 @@ document.addEventListener("keydown", (event) => {
 window.addEventListener("resize", () => { moveFilterPill(); if (currentView === "week") renderWeek(); });
 ensureTaskListOptions();
 updateNotifyButton();
+runDailyBackup();
 setView("today");
 connectToFirebase();
 
