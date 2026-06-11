@@ -1,16 +1,23 @@
 name: Send reminders
 
-# Checks for due task reminders and pushes notifications to subscribed devices.
-# GitHub's minimum cron interval is 5 minutes (and runs may be delayed a few
-# minutes under load), so reminders arrive within roughly 5-10 minutes.
+# GitHub's scheduled cron is heavily throttled on free runners (it can fire only
+# once every few HOURS), which is useless for timely reminders. Instead we run a
+# single long-lived worker that checks every 60 seconds for ~5.5 hours. The
+# schedule just keeps a fresh worker queued; `concurrency` ensures continuity so
+# coverage is effectively continuous. Public repos get unlimited free minutes.
 on:
   schedule:
     - cron: "*/5 * * * *"
-  workflow_dispatch: {} # lets you run it manually from the Actions tab
+  workflow_dispatch: {}
+  push:
+    branches: [master]
+    paths: [".github/workflows/reminders.yml", "scripts/send-reminders.mjs"]
 
 permissions:
   contents: read
 
+# Only one worker active; a newly-scheduled run queues and starts the moment the
+# current one finishes -> near-continuous coverage without overlap.
 concurrency:
   group: reminders
   cancel-in-progress: false
@@ -18,15 +25,23 @@ concurrency:
 jobs:
   send:
     runs-on: ubuntu-latest
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
       - run: npm install web-push@3.6.7 --no-save
-      - run: node scripts/send-reminders.mjs
+      - name: Check reminders every 60s
         env:
           FIREBASE_PROJECT_ID: personal-to-do-1d186
           VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
           VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+        run: |
+          end=$((SECONDS + 20400))   # ~5h40m, safely under the 355m timeout
+          while [ $SECONDS -lt $end ]; do
+            node scripts/send-reminders.mjs || echo "(pass failed, continuing)"
+            sleep 60
+          done
+          echo "Worker shift complete."
