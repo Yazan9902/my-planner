@@ -32,7 +32,9 @@ const backupPrefix = `planner-backup:${boardId}:`;
 const DEFAULT_SETTINGS = {
   accent: "", weekStart: 1, hour12: true, defaultRemind: -1,
   defaultList: "", weekStartHour: 6, weekEndHour: 23,
+  lock: true, lockCode: "0800",
 };
+const unlockedKey = `planner-unlocked:${boardId}`;
 
 // Smart (built-in) lists — dynamic views over all tasks.
 const SMART_LISTS = [
@@ -128,6 +130,14 @@ const monthDay = $("#month-day");
 /* New templates */
 const subtaskTemplate = $("#subtask-template");
 const monthCellTemplate = $("#month-cell-template");
+
+/* Passcode lock */
+const lockScreen = $("#lock-screen");
+const lockInner = lockScreen.querySelector(".lock-inner");
+const lockDots = $("#lock-dots");
+const lockKeypad = $("#lock-keypad");
+const setLock = $("#set-lock");
+const setLockcode = $("#set-lockcode");
 
 /* Task dialog */
 const taskDialog = $("#task-dialog");
@@ -1999,6 +2009,8 @@ function openSettings() {
   fillDefaultListOptions();
   fillHourOptions(setWeekstarthour, 0, 12, settings.weekStartHour);
   fillHourOptions(setWeekendhour, 13, 23, settings.weekEndHour);
+  setLock.value = settings.lock ? "on" : "off";
+  setLockcode.value = settings.lockCode || "";
   backupStatus.textContent = "";
   settingsDialog.showModal();
 }
@@ -2121,6 +2133,79 @@ function runDailyBackup() {
 }
 
 /* ============================================================
+   Passcode lock (soft privacy screen)
+   ============================================================ */
+let lockEntry = "";
+let lockBuilt = false;
+const lockCodeOf = () => settings.lockCode || "0800";
+
+function buildKeypad() {
+  if (lockBuilt) return;
+  lockBuilt = true;
+  ["1", "2", "3", "4", "5", "6", "7", "8", "9", "blank", "0", "back"].forEach((k) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    if (k === "blank") { btn.className = "lock-key blank"; btn.disabled = true; }
+    else if (k === "back") {
+      btn.className = "lock-key act";
+      btn.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-backspace" /></svg>`;
+      btn.setAttribute("aria-label", "Delete");
+      btn.addEventListener("click", () => { lockEntry = lockEntry.slice(0, -1); renderLockDots(); });
+    } else {
+      btn.className = "lock-key";
+      btn.textContent = k;
+      btn.addEventListener("click", () => lockDigit(k));
+    }
+    lockKeypad.append(btn);
+  });
+}
+function renderLockDots() {
+  lockDots.replaceChildren();
+  const len = lockCodeOf().length || 4;
+  for (let i = 0; i < len; i++) {
+    const d = document.createElement("i");
+    if (i < lockEntry.length) d.classList.add("on");
+    lockDots.append(d);
+  }
+}
+function lockDigit(d) {
+  if (lockEntry.length >= lockCodeOf().length) return;
+  lockEntry += d;
+  renderLockDots();
+  buzz(5);
+  if (lockEntry.length === lockCodeOf().length) setTimeout(checkLock, 120);
+}
+function checkLock() {
+  if (lockEntry === lockCodeOf()) {
+    sessionStorage.setItem(unlockedKey, "1");
+    lockScreen.hidden = true;
+    lockEntry = "";
+    buzz(14);
+  } else {
+    lockInner.classList.add("bad");
+    buzz([10, 40, 10]);
+    setTimeout(() => { lockInner.classList.remove("bad"); lockEntry = ""; renderLockDots(); }, 450);
+  }
+}
+function showLock() {
+  buildKeypad();
+  lockEntry = "";
+  renderLockDots();
+  lockScreen.hidden = false;
+}
+function maybeLock() {
+  if (settings.lock && lockCodeOf().length >= 1 && sessionStorage.getItem(unlockedKey) !== "1") showLock();
+}
+
+/* Settings wiring for the lock */
+setLock.addEventListener("change", () => { settings.lock = setLock.value === "on"; saveSettings(); });
+setLockcode.addEventListener("input", () => {
+  setLockcode.value = setLockcode.value.replace(/\D/g, "").slice(0, 4);
+  settings.lockCode = setLockcode.value || "0800";
+  saveSettings();
+});
+
+/* ============================================================
    Keyboard shortcuts (desktop convenience)
    ============================================================ */
 document.addEventListener("keydown", (event) => {
@@ -2147,6 +2232,7 @@ window.addEventListener("resize", () => { moveFilterPill(); if (currentView === 
 ensureTaskListOptions();
 updateNotifyButton();
 runDailyBackup();
+maybeLock();
 setView("today");
 connectToFirebase();
 

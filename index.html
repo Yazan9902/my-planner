@@ -122,7 +122,25 @@
       <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />
       </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="11" width="16" height="10" rx="2" />
+        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+      </symbol>
+      <symbol id="i-backspace" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 5H8l-6 7 6 7h13a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1Z" />
+        <path d="M17 9l-5 6M12 9l5 6" />
+      </symbol>
     </svg>
+
+    <!-- Passcode lock (soft privacy screen) -->
+    <div id="lock-screen" class="lock-screen" hidden>
+      <div class="lock-inner">
+        <div class="lock-logo"><svg class="icon" aria-hidden="true"><use href="#i-lock" /></svg></div>
+        <h2 id="lock-title">Enter passcode</h2>
+        <div id="lock-dots" class="lock-dots" aria-hidden="true"></div>
+        <div id="lock-keypad" class="lock-keypad"></div>
+      </div>
+    </div>
 
     <main class="app-shell">
       <header class="page-header">
@@ -514,6 +532,20 @@
           <span>Default list for new tasks</span>
           <select id="set-defaultlist"></select>
         </label>
+
+        <div class="form-row">
+          <label class="field">
+            <span>App lock</span>
+            <select id="set-lock">
+              <option value="off">Off</option>
+              <option value="on">On</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Passcode (4 digits)</span>
+            <input id="set-lockcode" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="0800" />
+          </label>
+        </div>
 
         <div class="form-row">
           <label class="field">
