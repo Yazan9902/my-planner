@@ -86,6 +86,44 @@ function fireAtUtc(task, tz) {
   return taskUtc - Number(task.remindMin) * 60000;
 }
 
+// ---- Daily digests (08:00 morning plan, 17:00 evening check-in, local time) ----
+const DIGEST_WINDOW_MIN = 120; // catch-up window so a brief worker gap won't skip the day
+
+function localParts(nowMs, tz) {
+  const d = new Date(nowMs + tz * 60000); // shift so UTC fields read as local wall time
+  return {
+    ymd: `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`,
+    mins: d.getUTCHours() * 60 + d.getUTCMinutes(),
+  };
+}
+function timeLabel(t) {
+  const [h, m] = t.split(":").map(Number);
+  const am = h < 12; let hh = h % 12; if (hh === 0) hh = 12;
+  return `${hh}:${pad(m)} ${am ? "AM" : "PM"}`;
+}
+function digestList(list) {
+  const sorted = list.slice().sort((a, b) => ((a.time || "99:99") < (b.time || "99:99") ? -1 : 1));
+  const items = sorted.slice(0, 6).map((t) => (t.time ? timeLabel(t.time) + " " : "") + t.title);
+  let body = items.join(" · ");
+  if (sorted.length > 6) body += ` +${sorted.length - 6} more`;
+  return body;
+}
+async function sendDigest(boardSubs, title, body, slotId) {
+  if (!(await claimReminder(slotId))) return 0; // already sent today
+  const payload = JSON.stringify({ title, body, tag: slotId, url: "." });
+  let n = 0;
+  for (const s of boardSubs) {
+    try {
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload);
+      n++;
+    } catch (err) {
+      if (err.statusCode === 404 || err.statusCode === 410) await deleteSub(s.id);
+      else console.error("digest push error", err.statusCode || err.message);
+    }
+  }
+  return n;
+}
+
 async function main() {
   const subs = await listCollection("pushSubs");
   if (subs.length === 0) { console.log("No push subscriptions. Nothing to do."); return; }
@@ -145,6 +183,30 @@ async function main() {
           }
         }
       }
+    }
+
+    // ---- Daily digests for this board ----
+    const lp = localParts(now, tz);
+    const todays = tasks.filter((t) => t.dueDate === lp.ymd);
+
+    if (lp.mins >= 8 * 60 && lp.mins < 8 * 60 + DIGEST_WINDOW_MIN) {
+      const undone = todays.filter((t) => !t.done);
+      const body = undone.length
+        ? `${undone.length} task${undone.length > 1 ? "s" : ""} today — ${digestList(undone)}`
+        : "Nothing scheduled today. Have a great day!";
+      sent += await sendDigest(boardSubs, "☀️ Today's plan", body, `${board}_digestAM_${lp.ymd}`);
+    }
+
+    if (lp.mins >= 17 * 60 && lp.mins < 17 * 60 + DIGEST_WINDOW_MIN) {
+      const left = todays.filter((t) => !t.done);
+      const overdue = tasks.filter((t) => !t.done && t.dueDate && t.dueDate < lp.ymd);
+      let body;
+      if (left.length === 0 && overdue.length === 0) body = "All done today 🎉 Nice work!";
+      else {
+        body = left.length ? `${left.length} left today — ${digestList(left)}` : "Today is clear";
+        if (overdue.length) body += ` · ${overdue.length} overdue`;
+      }
+      sent += await sendDigest(boardSubs, "🌙 Evening check-in", body, `${board}_digestPM_${lp.ymd}`);
     }
   }
   console.log(`Done. Sent ${sent} notification(s).`);
