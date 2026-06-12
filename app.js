@@ -2226,6 +2226,39 @@ document.addEventListener("keydown", (event) => {
 });
 
 /* ============================================================
+   iOS keyboard handling — float open bottom sheets above the keyboard
+   ============================================================ */
+const visualVp = window.visualViewport;
+function syncSheetViewport() {
+  const root = document.documentElement.style;
+  const sheetOpen = document.querySelector("dialog.sheet[open]");
+  if (!sheetOpen || !visualVp) {
+    root.setProperty("--kb", "0px");
+    root.removeProperty("--vvh");
+    return;
+  }
+  // Keyboard height = layout viewport - visible (visual) viewport.
+  const kb = Math.max(0, window.innerHeight - visualVp.height - visualVp.offsetTop);
+  root.setProperty("--kb", `${kb}px`);
+  root.setProperty("--vvh", `${visualVp.height}px`);
+}
+if (visualVp) {
+  visualVp.addEventListener("resize", syncSheetViewport);
+  visualVp.addEventListener("scroll", syncSheetViewport);
+}
+[quickDialog, taskDialog, settingsDialog].forEach((d) => d.addEventListener("close", syncSheetViewport));
+// Keep the focused field visible inside a sheet once the keyboard settles.
+document.addEventListener("focusin", (event) => {
+  const sheet = event.target.closest?.("dialog.sheet");
+  if (sheet && sheet.open && event.target.matches?.("input, textarea")) {
+    setTimeout(() => {
+      syncSheetViewport();
+      try { event.target.scrollIntoView({ block: "nearest" }); } catch {}
+    }, 280);
+  }
+});
+
+/* ============================================================
    Boot
    ============================================================ */
 window.addEventListener("resize", () => { moveFilterPill(); if (currentView === "week") renderWeek(); });

@@ -703,16 +703,28 @@ button { font-family: inherit; cursor: pointer; }
 }
 .dialog::backdrop { background: rgba(18, 16, 10, 0.52); backdrop-filter: blur(3px); }
 
-.sheet { margin: auto auto 0; border-radius: 24px 24px 0 0; width: 100%; max-width: 640px; }
-@media (min-width: 520px) { .sheet { margin: auto; border-radius: 24px; } }
+.sheet {
+  margin: auto auto 0;
+  border-radius: 24px 24px 0 0;
+  width: 100%;
+  max-width: 640px;
+  /* Lift the bottom sheet above the on-screen keyboard. --kb is the keyboard
+     height, set from the VisualViewport API in app.js (0 when no keyboard). */
+  transform: translateY(calc(-1 * var(--kb, 0px)));
+  transition: transform 0.2s ease;
+}
+@media (min-width: 520px) { .sheet { margin: auto; border-radius: 24px; transform: none; } }
 
 .dialog-body {
   padding: 22px 20px calc(20px + var(--safe-bottom));
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-height: 88dvh;
+  /* Cap to the visible area above the keyboard (--vvh) so the sheet always
+     fits and its body scrolls instead of hiding behind the keyboard. */
+  max-height: min(88dvh, calc(var(--vvh, 200vh) - 16px));
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .dialog-body h2 { margin: 0 0 2px; font-weight: 800; font-size: 1.35rem; letter-spacing: -0.02em; }
 
