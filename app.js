@@ -1569,7 +1569,6 @@ quickSuggestions.addEventListener("click", (event) => {
 });
 
 quickForm.addEventListener("submit", async (event) => {
-  // Keep the sheet open so you can brain-dump several things in a row.
   event.preventDefault();
   const raw = quickInput.value.trim();
   if (!raw) { quickInput.focus(); return; }
@@ -1587,13 +1586,10 @@ quickForm.addEventListener("submit", async (event) => {
     notes: "",
   });
   buzz(10);
+  // Close the sheet on Add and confirm with a toast.
   const when = quickPreviewText(p);
-  quickAdded.textContent = `Added “${p.title}”${when ? " · " + when : ""} ✓`;
-  quickInput.value = "";
-  quickPreview.textContent = "";
-  quickInput.focus();
-  clearTimeout(quickForm._addedTimer);
-  quickForm._addedTimer = setTimeout(() => { quickAdded.textContent = ""; }, 3500);
+  quickDialog.close();
+  showToast(`Added “${p.title}”${when ? " · " + when : ""}`);
 });
 
 quickMoreBtn.addEventListener("click", () => {

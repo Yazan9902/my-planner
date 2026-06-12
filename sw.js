@@ -1,5 +1,5 @@
 // Bump this version to force the cache to refresh after a deploy.
-const CACHE = "planner-v14";
+const CACHE = "planner-v15";
 
 // App shell — files needed to render the UI offline. Firebase SDK and task
 // data are network-first (handled below), not precached.
