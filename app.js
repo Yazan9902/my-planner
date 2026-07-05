@@ -32,7 +32,7 @@ const backupPrefix = `planner-backup:${boardId}:`;
 const DEFAULT_SETTINGS = {
   accent: "", weekStart: 1, hour12: true, defaultRemind: -1,
   defaultList: "", weekStartHour: 6, weekEndHour: 23,
-  lock: true, lockCode: "0800",
+  lock: true, lockCode: "0808",
 };
 const unlockedKey = `planner-unlocked:${boardId}`;
 
